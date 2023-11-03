@@ -4,7 +4,6 @@ from fastapi.responses import JSONResponse
 import db_helper
 import generic_helper
 import webhook_helper
-import re
 
 app = FastAPI()
 # Dictionary to store orders in prograss by session id (order stored as dictionary)
@@ -13,7 +12,10 @@ in_progress_orders = {}
 #Track order
 @app.get("/")
 async def default():
-    return "New Text"
+    '''
+    This function is the defualt text returned when the connection is established
+    '''
+    return "Default Text"
 
     
 
@@ -47,6 +49,10 @@ async def handle_request(request: Request):
 
 
 def add_to_order(parameters: dict, session_id: str):
+    '''
+    This function gets a dictionary of the parameters for the order.add intent, and adds it to the existing order dictionary
+    Returns: JSON response of current order or an error message
+    '''
     food_items = parameters['food-item']
     quantities = parameters['number']
 
@@ -63,16 +69,17 @@ def add_to_order(parameters: dict, session_id: str):
             in_progress_orders[session_id] = current_food_dict
         else:
             in_progress_orders[session_id] = new_food_dict
-
-        print('***************')
-        print(in_progress_orders)
-        print('***************')
         order_string = generic_helper.get_str_from_food_dict(in_progress_orders[session_id])
         fulfillment_text = f"So far you have: {order_string}. Do you need anything else"
 
     return JSONResponse(webhook_helper.webhook_message(fulfillment_text))
 
 def complete_order(parameters: dict, session_id: str):
+    '''
+    This function gets the session id for the order.complete intent, and adds it to the order MYSQL database,
+    removing the order from the existing orders dictionary
+    Returns: JSON response to confirm the order or an error message
+    '''
     # Check if the order exists in progress
     print(in_progress_orders)
     if session_id not in in_progress_orders:
@@ -95,6 +102,11 @@ def complete_order(parameters: dict, session_id: str):
     return JSONResponse(webhook_helper.webhook_message(fulfillment_text))
 
 def save_to_db(order: dict):
+    '''
+    This functions takes a dictionary of food items from an order, and stores the items into the database with the 
+    next order id, determined by the get_next_order_id() stored process
+    returns: Next order id for output message
+    '''
     # Get the next order # in the database
     next_order_id = db_helper.get_next_order_id()
     # Insert the items into the order items table
@@ -114,7 +126,8 @@ def save_to_db(order: dict):
 def track_order(parameters: dict, session_id: str):
 
     '''
-    This function is used to get the order id from the db, and return the status
+    This function is for the track.order intent, mapping the status from the order id stored in the db
+    Returns: JSON response of order status as store in db or error message
     '''
     # The JSON of the output from dialog flow has a dictionary for parameteers, so you can just call it for the order name
     order_id = parameters['number']
@@ -128,6 +141,10 @@ def track_order(parameters: dict, session_id: str):
     return JSONResponse(webhook_helper.webhook_message(fulfillment_text))
 
 def remove_from_order(parameters: dict, session_id: str):
+    '''
+    This function removes food items from the existing order dictionary based on the session id as the key.
+    Returns: JSOn object of removed food item(s), a message indicating no items lef tin order, or an error message
+    '''
     # Locate the session id
     if session_id not in in_progress_orders:
         fulfillment_text = "I'm having trouble finding your order. Can you place a new order?"
@@ -159,5 +176,3 @@ def remove_from_order(parameters: dict, session_id: str):
             fulfillment_text += f" Here is what is left in your order: {generic_helper.get_str_from_food_dict(current_order)}"
 
     return JSONResponse(webhook_helper.webhook_message(fulfillment_text))   
-    # Get value from value from session dict
-    # Remove the food items 
